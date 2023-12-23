@@ -1,0 +1,528 @@
+MODUL PROJECT :
+module projek.projekuas {
+    requires javafx.controls;
+    requires javafx.fxml;
+    requires java.base;
+    requires java.sql;
+
+    opens projek.projekuas to javafx.fxml;
+    exports projek.projekuas;
+    exports projek.projekuas.database;
+    exports projek.projekuas.catatan;
+}
+==========================================================================================================================================================
+APP JAVA :
+package projek.projekuas;
+
+import javafx.application.Application;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+import java.io.IOException;
+import projek.projekuas.database.DbConnect;
+
+/**
+ * JavaFX App
+ */
+public class App extends Application {
+
+    private static Scene scene;
+
+    @Override
+    public void start(Stage stage) throws IOException {
+        Parent root = FXMLLoader.load(getClass().getResource("dashboard.fxml"));
+        scene = new Scene(root);
+        stage.setScene(scene);
+        stage.setTitle("NotedR");
+        stage.show();
+    }
+
+    static void setRoot(String fxml) throws IOException {
+        scene.setRoot(loadFXML(fxml));
+    }
+
+    static Parent loadFXML(String fxml) throws IOException {
+        FXMLLoader fxmlLoader = new FXMLLoader(App.class.getResource(fxml + ".fxml"));
+        return fxmlLoader.load();
+    }
+
+    public static void main(String[] args) {
+        launch();
+        DbConnect db = new DbConnect();
+        db.getConnection();
+        System.out.println("connection status: "+db.getConnect());
+    }
+
+}
+==========================================================================================================================================================
+DASHBOARD CONTROLLER :
+package projek.projekuas;
+
+import java.io.IOException;
+import java.net.URL;
+import java.sql.Connection;
+import java.time.LocalDate;
+import java.util.ResourceBundle;
+import javafx.collections.ObservableList;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.input.MouseEvent;
+import projek.projekuas.catatan.Catatan;
+
+/**
+ * FXML Controller class
+ *
+ * @author Lenovo
+ */
+public class DashboardController implements Initializable {
+    
+    @Override
+    public void initialize(URL url, ResourceBundle rb) {
+        showCatatan();
+    } 
+    
+    @FXML
+    private Button btn_addnote;
+    @FXML
+    private TableView<Catatan> tableView;
+    @FXML
+    private TableColumn<Catatan, Integer> kolom_id;
+    @FXML
+    private TableColumn<Catatan, String> kolom_judul;
+    @FXML
+    private TableColumn<Catatan, String> kolom_catatan;
+    @FXML
+    private TableColumn<Catatan, LocalDate> kolom_tanggal;
+    
+    private Catatan catatan;
+    /**
+     * Initializes the controller class.
+     */   
+    
+    @FXML
+    private void addnote(ActionEvent event) throws IOException {
+        App.setRoot("main");
+    }
+    
+    public void showCatatan(){
+        projek.projekuas.database.AppQuery query = new projek.projekuas.database.AppQuery();
+        ObservableList<Catatan> list = query.getCatatanList();
+        kolom_id.setCellValueFactory(new PropertyValueFactory<>("id"));
+        kolom_judul.setCellValueFactory(new PropertyValueFactory<>("judul"));
+        kolom_catatan.setCellValueFactory(new PropertyValueFactory<>("catatan"));
+        kolom_tanggal.setCellValueFactory(new PropertyValueFactory<>("tanggal"));
+        tableView.setItems(list);
+    }
+    
+    @FXML
+    public void mouseClicked(MouseEvent event){
+        if (event.getClickCount() == 2) {
+            Catatan selectedCatatan = tableView.getSelectionModel().getSelectedItem();
+            projek.projekuas.database.AppQuery query = new projek.projekuas.database.AppQuery();
+            query.hapusCatatan(selectedCatatan);
+            tableView.getItems().remove(selectedCatatan);
+        }
+    }
+    
+}
+==========================================================================================================================================================
+MAIN CONTROLLER :
+package projek.projekuas;
+
+import java.io.IOException;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.time.LocalDate;
+import java.util.ResourceBundle;
+import javafx.event.ActionEvent;
+import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
+import javafx.scene.control.Button;
+import javafx.scene.control.DatePicker;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.Alert;
+import projek.projekuas.catatan.Catatan;
+import projek.projekuas.database.DbConnect;
+/**
+ * FXML Controller class
+ *
+ * @author Lenovo
+ */
+public class MainController implements Initializable {
+    
+    @FXML
+    public TextField input_judul;
+    @FXML
+    public TextArea input_catatan;
+    @FXML
+    public DatePicker mydatepicker;
+    @FXML
+    public Button btn_simpan;
+    @FXML
+    public Button btn_kembali;
+    
+    /**
+     * Initializes the controller class.
+     */
+    @Override
+    public void initialize(URL url, ResourceBundle rb) {
+        input_catatan.setWrapText(true);
+    }    
+
+    @FXML
+    private void simpan(ActionEvent event) throws IOException {
+        if (!input_judul.getText().isEmpty() && !input_catatan.getText().isEmpty() && mydatepicker.getValue() != null) {
+            projek.projekuas.catatan.Catatan catatan = new projek.projekuas.catatan.Catatan(
+                    input_judul.getText(),
+                    input_catatan.getText(),
+                    mydatepicker.getValue()
+            );
+            
+            projek.projekuas.database.AppQuery query = new projek.projekuas.database.AppQuery();
+            query.simpan(catatan);
+            App.setRoot("dashboard");
+        }
+        else {
+            // Jika tidak diisi, tampilkan pesan peringatan
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Peringatan");
+            alert.setHeaderText("Data tidak lengkap");
+            alert.setContentText("Silakan isi judul, catatan, atau tanggal terlebih dahulu");
+            alert.showAndWait();
+        }
+    }
+    private void clearField(){
+        input_judul.setText("");
+        input_catatan.setText("");
+        mydatepicker.setValue(LocalDate.MIN);
+    }
+
+
+    @FXML
+    private void kembali(ActionEvent event) throws IOException {
+        App.setRoot("dashboard");
+    }    
+
+    @FXML
+    private void judul(ActionEvent event) {
+    }
+
+    @FXML
+    private void set_datepicker(ActionEvent event) {
+    }
+    
+}
+==========================================================================================================================================================
+PRIMARY CONTROLLER :
+package projek.projekuas;
+
+import java.io.IOException;
+import javafx.fxml.FXML;
+
+public class PrimaryController {
+
+    @FXML
+    private void switchToSecondary() throws IOException {
+        App.setRoot("secondary");
+    }
+}
+==========================================================================================================================================================
+SECINDARY CONTROLLER :
+package projek.projekuas;
+
+import java.io.IOException;
+import javafx.fxml.FXML;
+
+public class SecondaryController {
+
+    @FXML
+    private void switchToPrimary() throws IOException {
+        App.setRoot("primary");
+    }
+}
+==========================================================================================================================================================
+CATATAN JAVA :
+package projek.projekuas.catatan;
+
+import java.time.LocalDate;
+
+
+/**
+ *
+ * @author Lenovo
+ */
+public class Catatan {
+    private Integer id;
+    private String judul;
+    private String catatan;
+    private LocalDate tanggal;
+    
+    public Catatan (Integer id, String judul, String catatan, LocalDate tanggal) {
+        this.id = id;
+        this.judul = judul;
+        this.catatan = catatan;
+        this.tanggal = tanggal;
+    }
+    
+    public Catatan (String judul, String catatan, LocalDate tanggal) {
+        this.id = id;
+        this.judul = judul;
+        this.catatan = catatan;
+        this.tanggal = tanggal;
+    }
+    
+    /**
+     * @return the id
+     */
+    public Integer getId() {
+        return id;
+    }
+
+    /**
+     * @param id the id to set
+     */
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    /**
+     * @return the judul
+     */
+    public String getJudul() {
+        return judul;
+    }
+
+    /**
+     * @param judul the judul to set
+     */
+    public void setJudul(String judul) {
+        this.judul = judul;
+    }
+
+    /**
+     * @return the catatan
+     */
+    public String getCatatan() {
+        return catatan;
+    }
+
+    /**
+     * @param catatan the catatan to set
+     */
+    public void setCatatan(String catatan) {
+        this.catatan = catatan;
+    }
+
+    /**
+     * @return the tanggal
+     */
+    public LocalDate getTanggal() {
+        return tanggal;
+    }
+
+    /**
+     * @param tanggal the tanggal to set
+     */
+    public void setTanggal(LocalDate tanggal) {
+        this.tanggal = tanggal;
+    }
+}
+==========================================================================================================================================================
+APP QUERY JAVA : 
+package projek.projekuas.database;
+
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+/**
+ *
+ * @author Lenovo
+ */
+public class AppQuery {
+    
+    private DbConnect c = new DbConnect();
+    
+    public void simpan(projek.projekuas.catatan.Catatan catatan){
+        try {
+            c.getConnection();
+            java.sql.PreparedStatement ps = c.getConnect().prepareStatement("insert into catatan(judul, catatan, tanggal)value(?, ?, ?)");
+            ps.setString(1, catatan.getJudul());
+            ps.setString(2, catatan.getCatatan());
+            ps.setDate(3, Date.valueOf(catatan.getTanggal()));
+            ps.execute();
+            ps.close();
+            c.closeConnection();
+        }   
+        catch(Exception e) {
+            e.printStackTrace();
+        }  
+    }
+    
+    public void hapusCatatan(projek.projekuas.catatan.Catatan catatan){
+        try {
+            c.getConnection();
+            java.sql.PreparedStatement ps = c.getConnect().prepareStatement("DELETE FROM catatan WHERE `catatan`.`id` = ?");
+            ps.setInt(1, catatan.getId());
+            ps.execute();
+            ps.close();
+            c.closeConnection();
+        }   
+        catch(Exception e) {
+            e.printStackTrace();
+        }  
+    }
+
+    
+    public ObservableList<projek.projekuas.catatan.Catatan> getCatatanList(){
+        
+        ObservableList<projek.projekuas.catatan.Catatan> catatanList = FXCollections.observableArrayList();
+        
+        try{
+            String query = "select judul, catatan, tanggal from catatan order by tanggal asc";
+            c.getConnection();
+            Statement st = c.getConnect().createStatement();
+            ResultSet rs = st.executeQuery(query);
+            projek.projekuas.catatan.Catatan note;
+            while(rs.next()){
+                note = new projek.projekuas.catatan.Catatan(
+                        rs.getString("judul"), 
+                        rs.getString("catatan"), 
+                        rs.getDate("tanggal").toLocalDate()
+                );
+                catatanList.add(note);
+            }
+            rs.close();
+            st.close();
+            c.closeConnection();
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+        return catatanList;
+    }
+}
+==========================================================================================================================================================
+DATABASE CONNECT JAVA :
+package projek.projekuas.database;
+
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+/**
+ *
+ * @author Lenovo
+ */
+public class DbConnect {
+    
+    private static Connection connection;
+    
+    public void getConnection() {
+        String databaseName = "db";
+        String databaseUser = "root";
+        String databasePassword = "";
+        
+        String url = "jdbc:mysql://localhost/" + databaseName;
+        
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            connection = DriverManager.getConnection(url, databaseUser, databasePassword);
+        }
+        catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+    public static Connection getConnect(){
+        return connection;
+    }
+    
+    public static void setConect(Connection aCon){
+        connection = aCon;
+    }
+    public static void closeConnection(){
+        try{
+            connection.close();
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+}
+
+/*
+public void mouseClicked(MouseEvent event){
+        try{
+            
+            App.setRoot("main");
+            Catatan catatan = tableView.getSelectionModel().getSelectedItem();
+            catatan = new Catatan(catatan.getJudul(), catatan.getCatatan(), catatan.getTanggal());
+            this.catatan = catatan;
+            input_judul
+        }
+        catch(Exception e){
+            e.printStackTrace();
+        }
+    }
+*/
+
+/*Parent parent = FXMLLoader.load(getClass().getResource("/tableView/dashboard.fxml"));
+        Scene scene = new Scene(parent);
+        Stage stage = new Stage();
+        stage.setScene(scene);
+        stage.initStyle(StageStyle.UTILITY);
+        stage.show();
+
+public void mouseClicked(MouseEvent event){
+        if (event.getClickCount() == 1) {
+            Catatan selectedCatatan = tableView.getSelectionModel().getSelectedItem();
+            //catatan = new projek.projekuas.catatan.Catatan(catatan.getJudul(), catatan.getCatatan(), catatan.getTanggal());
+            //this.catatan = catatan;
+            try {
+                MainController mainController = new MainController();
+                mainController.editCatatan(selectedCatatan);
+                App.setRoot("main");
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+public void editCatatan(Catatan catatan) {
+        catatan = new projek.projekuas.catatan.Catatan(catatan.getJudul(), catatan.getCatatan(), catatan.getTanggal());
+        //this.catatan = catatan;
+        this.input_judul.setText(catatan.getJudul());
+        this.input_catatan.setText(catatan.getCatatan());
+        this.mydatepicker.setValue(catatan.getTanggal());
+        // If you have a delete button, disable it for editing
+        btn_hapus.setDisable(false);
+        btn_update.setDisable(false);
+        
+    }
+*/
+
+/*Catatan selectedCatatan = tableView.getSelectionModel().getSelectedItem();
+        catatan = new projek.projekuas.catatan.Catatan(catatan.getJudul(), catatan.getCatatan(), catatan.getTanggal());
+        this.catatan = catatan;
+        try {
+            MainController mainController = new MainController();
+            mainController.editCatatan(selectedCatatan);
+            App.setRoot("main");
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+        }*/
+==========================================================================================================================================================
